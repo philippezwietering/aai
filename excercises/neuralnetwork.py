@@ -1,67 +1,85 @@
 from neuron import *
+import random
 
 # This class automatically constructs a NN given the number of desired nodes.
-# The class assumes all nodes of each layer have a dependency of all nodes of the previous layer.
+# The class assumes all nodes of each layer have a dependency on all nodes of the previous layer.
 # Bias nodes don't have to be added manually, the weights have to be included in the list though
 class NeuralNetwork:
     def __init__(self, initialValues, listsOfWeights):
-        self.startNeurons = [StartNeuron(-1)] + [StartNeuron(init) for init in initialValues]
-        self.neurons = []
-        firstLayer = True
+        self.neurons = [[StartNeuron(-1)] + [StartNeuron(init) for init in initialValues]]
         for layer in listsOfWeights:
-            if not firstLayer:
-                self.neurons.append([StartNeuron(-1)] + [Neuron(self.neurons[-1], weights) for weights in layer])
-            else:
-                firstLayer = False
-                self.neurons.append([StartNeuron(-1)] + [Neuron(self.startNeurons, weights) for weights in layer])
+            self.neurons.append([StartNeuron(-1)] + [Neuron(self.neurons[-1], weights) for weights in layer])
         self.neurons[-1] = self.neurons[-1][1:] # Throw away the bias that is present in the last layer
 
+    def __str__(self):
+        return "NeuralNetwork object with the following neurons:\n" + str([str(layer) + "\n" for layer in self.neurons])
+
     def evaluate(self):
-        self.reset()
         return [endNeuron.evaluate() for endNeuron in self.neurons[-1]]
 
     def evaluateWith(self, inits):
-        if not len(inits) + 1 == len(self.startNeurons):
-            return
-        else:
-            self.reset()
-            self.changeInits(inits)
-            return self.evaluate()
+        assert len(inits) + 1 == len(self.neurons[0]), "Not the correct number of input values"
+        self.reset()
+        self.changeInits(inits)
+        return self.evaluate()
 
     def reset(self):
         for endNeuron in self.neurons[-1]:
             endNeuron.reset()
 
     def changeInits(self, initialValues):
-        if not len(initialValues) + 1 == len(self.startNeurons):
-            return
-        else:
-            for i in range(len(initialValues)):
-                self.startNeurons[i+1].changeInit(initialValues[i])
+        assert len(initialValues) + 1 == len(self.neurons[0]), "Not the correct number of input values"
+        for i in range(len(initialValues)):
+            self.neurons[0][i+1].changeInit(initialValues[i])
 
-    def cost(self, trainingValues): # Assuming trainingValues is a list of tuples (input, expected output)
+    def cost(self, trainingValues): # Assuming trainingValues is a list of tuples ([input], [expected output])
         result = 0
         for training in trainingValues:
             result += distance(self.evaluateWith(training[0]), training[1])
         return result/(2*len(trainingValues))
 
+    def singleLayerDelta(self, eta, trainingValues): # Same assumptions for traingingValues as for cost
+        for training in trainingValues:
+            desiredEndNeurons = training[1]
+            realEvaluation = self.evaluateWith(training[0])
+            for k in range(len(self.neurons[-1])): # Need to iterate over two lists at the same time
+                desiredEndNeuronOutput = desiredEndNeurons[k]
+                realEndNeuron = realEvaluation[k]
+                newWeights = []
+                for i in range(len(self.neurons[-1][k].weights)): # Again 2 different lists to iterate
+                    newWeights.append(self.neurons[-1][k].weights[i] + eta * sigmoid(self.neurons[-1][k].parents[i].evaluation) * 
+                                      sigmoidP(sum(zipWith([p.evaluation for p in self.neurons[-1][k].parents], self.neurons[-1][k].weights, operator.mul))) *
+                                     (sigmoid(realEndNeuron) - sigmoid(desiredEndNeuronOutput)))
+                self.neurons[-1][k].weights = newWeights
 
 # Helper functions
 def distance(x, y): # between two lists
     help = 0
-    if len(x) != len(y):
-        return -1
+    assert len(x) == len(y), "Inproduct only possible for same dimensions"
     for i in range(len(x)):
         help += (y[i]-x[i])**2
     return math.sqrt(help)
 
+
+# Used for testing
 def main():
     print("Testing of NeuralNetwork with NOR from excercise 4.1 combined with an AND")
-    testNN = NeuralNetwork([0, 0, 0], [[[1, 2, 2, 2], [2.5, 1, 1, 1]]])
+    testNN = NeuralNetwork([0, 0, 0], [[[-1, -2, -2, -2], [2.5, 1, 1, 1]]])
     for a in range(2):
         for b in range(2):
             for c in range(2):
                 print(f"With start values {a}, {b} and {c}, the results are {testNN.evaluateWith([a,b,c])}")
+    print("\nTesting of singleLayerDelta:")
+    testDelta = NeuralNetwork([0,0,0],[[[random.uniform(-1,1) for i in range(4)],[random.uniform(-5,5) for i in range(4)]]])
+    print("We want to get two output neurons, a NOR and an AND gate. \nThe NN beforehand: " + str(testDelta))
+    trainingData = []
+    for a in range(2):
+        for b in range(2):
+            for c in range(2):
+                trainingData.append(([a,b,c], [int(not (a or b or c)), int(a and b and c)]))
+    for n in range(100):
+        testDelta.singleLayerDelta(0.01, trainingData)
+    print("End result: " + str(testDelta))
 
 # Only execute main when testing the module, not when it is loaded by something else
 if __name__ == '__main__':
