@@ -10,6 +10,9 @@ class Neuron:
         self.evaluated = False
         self.evaluation = 0
 
+    def __repr__(self):
+        return self.__str__()
+
     def __str__(self):
         return "Neuron with weights of " + str(self.weights)
 
@@ -32,22 +35,25 @@ class Neuron:
 # The little brother of neuron, the startneuron doesn't have a lot of functionality
 class StartNeuron:
     def __init__(self, initialValue):
-        self.init = initialValue
+        self.evaluation = initialValue
+
+    def __repr__(self):
+        return self.__str__()
 
     def __str__(self):
-        return "StartNeuron with value " + str(self.init)
+        return "StartNeuron with value " + str(self.evaluation)
 
     def evaluate(self):
-        return self.init
+        return self.evaluation
 
     def reset(self): # So we can recursively reset the evaluations without having to think about the startneurons, which are just less special
         return
 
     def changeInit(self, value):
-        self.init = value
+        self.evaluation = value
 
     def getInit(self):
-        return self.init
+        return self.evaluation
 
 # Helper functions
 def zipWith(l1, l2, f):
@@ -57,7 +63,7 @@ def sigmoid(x):
     return 1/(1+math.exp(-x))
 
 def sigmoidP(x):
-    return x(1-x)
+    return x*(1-x)
 
 def stepFunction(x):
     return 0 if x < 0 else 1
