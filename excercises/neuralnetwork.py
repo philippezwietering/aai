@@ -52,10 +52,39 @@ class NeuralNetwork:
                                      (sigmoid(realEndNeuron) - sigmoid(desiredEndNeuronOutput)))
                 self.neurons[-1][k].weights = newWeights
 
+    def backpropagation(self, eta, trainingValues):
+        for training in trainingValues:
+            desiredEndNeurons = training[1]
+            realEvaluation = self.evaluateWith(training[0])
+            errorDelta = []
+            for index in range(len(self.neurons) - 1): # For every layer except the starting layer, but gonna walk through in reverse order
+                i = len(self.neurons) - index - 1
+                neuronErrors = []
+                if index == 0:
+                    for j in range(len(self.neurons[i])): # So for every endneuron
+                        weightErrors = []
+                        desiredEndNeuronOutput = desiredEndNeurons[j]
+                        for k in range(len(self.neurons[i][j].weights)): # k is the index of the weight in the neuron j of layer i
+                            weightErrors.append(eta * sigmoid(self.neurons[i][j].parents[i].evaluation) * 
+                                                sigmoidP(sum(zipWith([p.evaluation for p in self.neurons[i][j].parents], self.neurons[i][j].weights, operator.mul))) *
+                                                (sigmoid(realEvaluation[j]) - sigmoid(desiredEndNeuronOutput)))
+                        neuronErrors.append(weightErrors)
+                else:
+                    for j in range(len(self.neurons[i]) - 1): # j is the index of the current neuron in layer i, but we want only non-bias neurons, so j = j+1
+                        weightErrors = []
+                        childErrorsList = list(map(list, zip(*errorDelta[0])))# Tricky way to transpose matrix, and then we get the j + 1 element, which should be all parents
+                        childErrors = childErrorsList[j+1]
+                        for k in range(len(self.neurons[i][j+1].weights)): # k is the index of the weight in neuron j of layer i
+                            weightErrors.append(eta * sigmoid(self.neurons[i][j+1].parents[k].evaluation) *
+                                                sigmoidP(sum(zipWith([p.evaluation for p in self.neurons[i][j+1].parents], self.neurons[i][j+1].weights, operator.mul))) *
+                                                sum(zipWith(childErrors[k], [child.weights[k] for child in self.neurons[i+1]], operator.mul)))
+                        neuronErrors.append(weightErrors)
+                errorDelta.insert(0, neuronErrors)
+
 # Helper functions
 def distance(x, y): # between two lists
     help = 0
-    assert len(x) == len(y), "Inproduct only possible for same dimensions"
+    assert len(x) == len(y), "Hypo only possible for same dimensions"
     for i in range(len(x)):
         help += (y[i]-x[i])**2
     return math.sqrt(help)
@@ -70,8 +99,8 @@ def main():
             for c in range(2):
                 print(f"With start values {a}, {b} and {c}, the results are {testNN.evaluateWith([a,b,c])}")
     print("\nTesting of singleLayerDelta:")
-    testDelta = NeuralNetwork([0,0,0],[[[random.uniform(-1,1) for i in range(4)],[random.uniform(-5,5) for i in range(4)]]])
-    print("We want to get two output neurons, a NOR and an AND gate. \nThe NN beforehand: " + str(testDelta))
+    testDelta = NeuralNetwork([0,0,0],[[[random.uniform(-1,1) for i in range(4)],[random.uniform(-1,1) for i in range(4)]]])
+    print("We want to get two output neurons, a NOR and an AND gate, using the single layer delta rule. \nThe NN beforehand: " + str(testDelta))
     trainingData = []
     for a in range(2):
         for b in range(2):
@@ -80,6 +109,16 @@ def main():
     for n in range(100):
         testDelta.singleLayerDelta(0.01, trainingData)
     print("End result: " + str(testDelta))
+
+    print("\nTesting of backpropagation with XOR:\n")
+    trainingData = []
+    for a in range(2):
+        for b in range(2):
+            trainingData.append(([a, b], [int((a or b) and not (a == b))]))
+    testxor = NeuralNetwork([0,0],[[[random.uniform(-1,1) for i in range(2)],[random.uniform(-1,1) for i in range(2)]], [[random.uniform(-1, 1) for i in range(2)]]])
+    print("The NN beforehand: " + str(testxor))
+    for n in range(100):
+        testxor.backpropagation(0.01, trainingData)
 
 # Only execute main when testing the module, not when it is loaded by something else
 if __name__ == '__main__':
