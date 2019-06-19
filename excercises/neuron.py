@@ -3,12 +3,14 @@ import math
 
 # Neuron class
 # NB. End neurons are just normal neurons with a different meaning, but they have the exact same functionality
+# The weight i,j is saved in node j, so it is way easier to evaluate stuff and it saves on functionality necessary for startNodes
 class Neuron:
     def __init__(self, parents, weights):
         self.parents = parents
         self.weights = weights
         self.evaluated = False
         self.evaluation = 0
+        self.error = 0
 
     def __repr__(self):
         return self.__str__()
@@ -31,11 +33,30 @@ class Neuron:
             for parent in self.parents:
                 parent.reset()
 
+    # If expectation is None then this is for hidden nodes, if weightsErrors is None then this is for output nodes (but one should be filled)
+    def deltaRule(self, weightsErrors = None, oracle = None): 
+        if weightsErrors is not None and oracle is not None or weightsErrors is None and oracle is None:
+            return
+
+        parentEvaluations = [p.evaluate() for p in self.parents]
+        incoming = sum(zipWith(parentEvaluations, self.weights, operator.mul))
+
+        if oracle is None:
+            self.error = sigmoidP(incoming) * weightsErrors
+        if weightsErrors is None:
+            self.error = sigmoidP(incoming) * (oracle - self.evaluation)
+        return self.error
+
+    def updateWeights(self, learnRate):
+        for i in range(len(self.weights)):
+            self.weights[i] = self.weights[i] + learnRate * self.parents[i].evaluation * self.error
+
 
 # The little brother of neuron, the startneuron doesn't have a lot of functionality
 class StartNeuron:
     def __init__(self, initialValue):
         self.evaluation = initialValue
+        self.evaluated = True
 
     def __repr__(self):
         return self.__str__()
@@ -55,6 +76,23 @@ class StartNeuron:
     def getInit(self):
         return self.evaluation
 
+class Bias:
+    def __init__(self):
+        self.evaluation = -1
+        self.evaluated = True
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return "Bias node"
+
+    def evaluate(self):
+        return self.evaluation
+
+    def reset(self):
+        return
+
 # Helper functions
 def zipWith(l1, l2, f):
     return [f(a, b) for (a, b) in zip(l1, l2)]
@@ -72,7 +110,7 @@ def stepFunction(x):
 # and a half-adder from excercise 4.2:
 def main():
     print("Testing Neuron with NOR-gate\n---------------------------------------")
-    bias = StartNeuron(-1)
+    bias = Bias()
     xNeuron = StartNeuron(0)
     yNeuron = StartNeuron(0)
     zNeuron = StartNeuron(0)
