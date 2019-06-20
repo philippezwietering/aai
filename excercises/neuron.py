@@ -5,6 +5,8 @@ import math
 # NB. End neurons are just normal neurons with a different meaning, but they have the exact same functionality
 # The weight i,j is saved in node j, so it is way easier to evaluate stuff and it saves on functionality necessary for startNodes
 class Neuron:
+    # parents are the Neurons wich this neuron should receive evaluations from. Used to do stuff recursively
+    # weights should be a list of weights for each parent
     def __init__(self, parents, weights):
         self.parents = parents
         self.weights = weights
@@ -15,6 +17,7 @@ class Neuron:
     def __repr__(self):
         return self.__str__()
 
+    # Returns the neuron with its weights
     def __str__(self):
         return "Neuron with weights of " + str(self.weights)
 
@@ -22,17 +25,21 @@ class Neuron:
     def evaluate(self):
         if not self.evaluated:
             parentEvaluations = [p.evaluate() for p in self.parents]
-            self.evaluation = sigmoid(sum(zipWith(parentEvaluations, self.weights, operator.mul)))
+            self.evaluation = relu(sum(zipWith(parentEvaluations, self.weights, operator.mul)))
             self.evaluated = True
         return self.evaluation
 
     # Again, lazy evaluated, should save a little bit of time
+    # This function erases all stored evaluations
     def reset(self):
         if self.evaluated:
             self.evaluated = False
             for parent in self.parents:
                 parent.reset()
 
+    # Applies the deltaRule for a neuron.
+    # weightsErrors is the weightsummed error for the layer of this node
+    # oracle is the expected value for an output node
     # If expectation is None then this is for hidden nodes, if weightsErrors is None then this is for output nodes (but one should be filled)
     def deltaRule(self, weightsErrors = None, oracle = None): 
         if weightsErrors is not None and oracle is not None or weightsErrors is None and oracle is None:
@@ -42,14 +49,16 @@ class Neuron:
         incoming = sum(zipWith(parentEvaluations, self.weights, operator.mul))
 
         if oracle is None:
-            self.error = sigmoidP(incoming) * weightsErrors
+            self.error = reluP(incoming) * weightsErrors
         if weightsErrors is None:
-            self.error = sigmoidP(incoming) * (oracle - self.evaluation)
+            self.error = reluP(incoming) * (oracle - self.evaluation)
         return self.error
 
+    # Updates the weights according to the learnrate and the error calculated during the application of the deltarule function
     def updateWeights(self, learnRate):
         for i in range(len(self.weights)):
             self.weights[i] = self.weights[i] + learnRate * self.parents[i].evaluation * self.error
+            self.error = 0
 
 
 # The little brother of neuron, the startneuron doesn't have a lot of functionality
@@ -76,33 +85,51 @@ class StartNeuron:
     def getInit(self):
         return self.evaluation
 
-class Bias:
-    def __init__(self):
-        self.evaluation = -1
-        self.evaluated = True
-
-    def __repr__(self):
-        return self.__str__()
-
-    def __str__(self):
-        return "Bias node"
-
-    def evaluate(self):
-        return self.evaluation
-
-    def reset(self):
+    def deltaRule(self, weightsErrors, oracle):
         return
 
+    def updateWeights(self, learnRate):
+        return
+
+# class Bias:
+#     def __init__(self):
+#         self.evaluation = -1
+#         self.evaluated = True
+
+#     def __repr__(self):
+#         return self.__str__()
+
+#     def __str__(self):
+#         return "Bias node"
+
+#     def evaluate(self):
+#         return self.evaluation
+
+#     def reset(self):
+#         return
+
 # Helper functions
+# Standard zipWith function, takes two lists and a function that takes two arguments and zips that together
 def zipWith(l1, l2, f):
     return [f(a, b) for (a, b) in zip(l1, l2)]
 
+# Relu function for x
+def relu(x):
+    return max(0, x)
+
+# Derivative of the relu function
+def reluP(x):
+    return stepFunction(x)
+
+# Calculates the sigmoid of x
 def sigmoid(x):
     return 1/(1+math.exp(-x))
 
+# Derivative of the sigmoid function
 def sigmoidP(x):
     return x*(1-x)
 
+# Stepfunction of x
 def stepFunction(x):
     return 0 if x < 0 else 1
 
